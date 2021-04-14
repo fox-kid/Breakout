@@ -1,0 +1,257 @@
+<html>
+  <head>
+    <title>Breakout</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+
+    <script
+      type="text/javascript"
+      src="https://static.codehs.com/gulp/6d7c3ccf9b1aa19f20e8a8001b72e9509b9bb253/chs-js-lib/chs.js"
+    ></script>
+
+    <style>
+      canvas {
+        border: 1px solid black;
+        display: inline-block;
+        vertical-align: top;
+      }
+
+      pre {
+        border: 1px solid black;
+        display: inline-block;
+        width: 400px;
+        height: 500px;
+        background-color: #f5f5f5;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Breakout</h1>
+
+    <canvas width="400" height="500" class="codehs-editor-canvas"></canvas>
+    <pre id="console"></pre>
+
+    <script>
+      window.onload = function () {
+        /* Constants for bricks */
+        var NUM_ROWS = 8;
+        var BRICK_TOP_OFFSET = 10;
+        var BRICK_SPACING = 2;
+        var NUM_BRICKS_PER_ROW = 10;
+        var BRICK_HEIGHT = 10;
+        var SPACE_FOR_BRICKS =
+          getWidth() - (NUM_BRICKS_PER_ROW + 1) * BRICK_SPACING;
+        var BRICK_WIDTH = SPACE_FOR_BRICKS / NUM_BRICKS_PER_ROW;
+        var paddle;
+        var brick;
+        var x;
+        var y;
+
+        var color = [Color.red, Color.orange, Color.green, Color.blue];
+        var currentColor = 0;
+        var rowCount = 1;
+        /* Constants for ball and paddle */
+        var PADDLE_WIDTH = 80;
+        var PADDLE_HEIGHT = 15;
+        var PADDLE_OFFSET = 10;
+        var paddleX = (getWidth() - PADDLE_WIDTH) / 2;
+        var paddleY = getHeight() - PADDLE_HEIGHT - PADDLE_OFFSET;
+
+        var BALL_RADIUS = 15;
+        var ball;
+        var dx = Randomizer.nextInt(-6, 6);
+        var dy = 6;
+
+        var chancesLeft;
+
+        var crashedBrick;
+        var moving = true;
+        var brickNum = NUM_ROWS * NUM_BRICKS_PER_ROW;
+        var score = 0;
+
+        var ballLeftTop;
+        var ballLeftBot;
+        var ballRightTop;
+        var ballRightBot;
+
+        function start() {
+          chancesLeft = 3;
+          buildWall();
+          drawPaddle();
+          createBall();
+          mouseMoveMethod(slide);
+          setTimer(bounce, 25);
+          mouseClickMethod(moveAgain);
+        }
+
+        // Draws ball
+        function createBall() {
+          ball = new Circle(BALL_RADIUS);
+          ball.setPosition(getWidth() / 2, getHeight() / 2);
+          add(ball);
+        }
+        // Makes ball bounce off of the walls
+        function bounce() {
+          checkArea();
+          ball.move(dx, dy);
+        }
+        // Builds game wall of bricks
+        function buildWall() {
+          for (y = 0; y < NUM_ROWS; y++) {
+            for (x = 0; x < NUM_BRICKS_PER_ROW; x++) {
+              var brickXPos = BRICK_SPACING + x * (BRICK_WIDTH + BRICK_SPACING);
+              var brickYPos =
+                BRICK_TOP_OFFSET + y * (BRICK_HEIGHT + BRICK_SPACING);
+              drawBricks(brickXPos, brickYPos, color[currentColor]);
+            }
+            rowDetection();
+          }
+        }
+        // Draws brick rectangles
+        function drawBricks(x, y, color) {
+          brick = new Rectangle(BRICK_WIDTH, BRICK_HEIGHT);
+          brick.setPosition(x, y);
+          brick.setColor(color);
+          add(brick);
+        }
+        // Draws a paddle
+        function drawPaddle() {
+          paddle = new Rectangle(PADDLE_WIDTH, PADDLE_HEIGHT);
+          paddle.setPosition(paddleX, paddleY);
+          paddle.setColor(Color.purple);
+          add(paddle);
+        }
+        // Detects which row it is to change color after each two rows
+        function rowDetection() {
+          if (rowCount % 2 == 0) {
+            rowCount = 1;
+            changeColor();
+          } else {
+            rowCount++;
+          }
+        }
+        // Changes color of every second row
+        function changeColor() {
+          if (currentColor != color.length - 1) {
+            currentColor++;
+          } else {
+            currentColor = 0;
+          }
+        }
+        // Chechks if ball is crashing a brick or a wall.
+        function checkArea() {
+          ballLeftTop = getElementAt(
+            ball.getX() - BALL_RADIUS,
+            ball.getY() - BALL_RADIUS
+          );
+          ballLeftBot = getElementAt(
+            ball.getX() - BALL_RADIUS,
+            ball.getY() + BALL_RADIUS
+          );
+          ballRightTop = getElementAt(
+            ball.getX() + BALL_RADIUS,
+            ball.getY() - BALL_RADIUS
+          );
+          ballRightBot = getElementAt(
+            ball.getX() + BALL_RADIUS,
+            ball.getY() + BALL_RADIUS
+          );
+          var crash =
+            ballLeftTop != null ||
+            ballLeftBot != null ||
+            ballRightTop != null ||
+            ballRightBot != null;
+
+          if (crash) {
+            removeAndBounce();
+          } else {
+            checkWalls();
+          }
+        }
+        // Checks which side of the ball hit the brick,
+        // removes that brick and bounces backwards.
+        function removeAndBounce() {
+          if (ballLeftTop != null && ballLeftTop != paddle) {
+            remove(ballLeftTop);
+            dy = -dy;
+            score++;
+          } else if (ballLeftBot != null && ballLeftBot != paddle) {
+            remove(ballLeftBot);
+            dy = -dy;
+            score++;
+          } else if (ballRightTop != null && ballRightTop != paddle) {
+            remove(ballRightTop);
+            dy = -dy;
+            score++;
+          } else if (ballRightBot != null && ballRightBot != paddle) {
+            remove(ballRightBot);
+            dy = -dy;
+            score++;
+          } else {
+            dy = -dy;
+          }
+          if (brickNum - score == 0) {
+            endingText('YOU WIN!');
+          }
+        }
+
+        // Ball checks if there is a wall so it bounces back.
+        function checkWalls() {
+          if (ball.getX() + ball.getRadius() > getWidth()) {
+            dx = -dx;
+          } else if (ball.getX() - ball.getRadius() < 0) {
+            dx = -dx;
+          } else if (ball.getY() - ball.getRadius() < 0) {
+            dy = -dy;
+          } else if (ball.getY() + ball.getRadius() > getHeight()) {
+            stopTimer(bounce);
+            ball.setPosition(getWidth() / 2, getHeight() / 2);
+            moving = !moving;
+            chancesLeft--;
+            if (chancesLeft == 0) {
+              endingText('GAME OVER');
+            }
+          }
+        }
+
+        // Makes the ball start moving again on mouse
+        // click after it has fallen down. It starts
+        // moving upwards tho, like in the example.
+        function moveAgain() {
+          if (!moving) {
+            setTimer(bounce, 25);
+            dy = -dy;
+            moving = !moving;
+          }
+        }
+        // Makes paddle slide with the mouse movement.
+        function slide(e) {
+          paddle.setPosition(e.getX() - PADDLE_WIDTH / 2, paddleY);
+          if (e.getX() < PADDLE_WIDTH / 2) {
+            paddle.setPosition(0, paddleY);
+          } else if (e.getX() > getWidth() - PADDLE_WIDTH / 2) {
+            paddle.setPosition(getWidth() - PADDLE_WIDTH, paddleY);
+          }
+        }
+
+        // Shows "YOU WIN!" text if you break all the bricks or
+        // "GAME OVER" text if you lose aka if your ball falls down
+        // three times.
+        function endingText(x) {
+          removeAll();
+          var txt = new Text(x, '40pt Arial');
+          txt.setPosition(
+            getWidth() / 2 - txt.getWidth() / 2,
+            getHeight() / 2 + txt.getHeight() / 2
+          );
+          add(txt);
+        }
+
+        if (typeof start === 'function') {
+          start();
+        }
+      };
+    </script>
+  </body>
+</html>
